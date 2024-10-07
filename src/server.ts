@@ -7,7 +7,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "*", // Your React app
+    origin: "https://foodiepicker.netlify.app", // Your React app
     methods: ["GET", "POST"],
   },
 });
