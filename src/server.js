@@ -36,19 +36,34 @@ io.on("connection", (socket) => {
             };
         }
         socket.join(sessionId); // Join the room
+        sessions[sessionId].guests.push(socket.id); //add the host
         socket.emit("role-assigned", "host"); // Assign the role of 'host' to the user
         socket.emit("current-restaurants", sessions[sessionId].restaurants);
+        io.to(sessionId).emit("current-users", {
+            count: sessions[sessionId].guests.length, //including the host
+        });
+        console.log(sessions[sessionId].guests);
     });
     // Join an existing session (guest)
     socket.on("join-session", (sessionId) => {
         if (sessions[sessionId]) {
-            sessions[sessionId].guests.push(socket.id); // Add the guest
-            socket.join(sessionId); // Join the room
-            socket.emit("role-assigned", "guest"); // Assign the role of 'guest'
-            socket.emit("current-restaurants", sessions[sessionId].restaurants); // Send the current list of restaurants
+            if (sessions[sessionId].guests.length >= 10) {
+                socket.emit("error", "Room is full. Max 10 users allowed");
+            }
+            else {
+                sessions[sessionId].guests.push(socket.id); // Add the guest
+                socket.join(sessionId); // Join the room
+                socket.emit("role-assigned", "guest");
+                socket.emit("current-restaurants", sessions[sessionId].restaurants);
+                io.to(sessionId).emit("current-users", {
+                    count: sessions[sessionId].guests.length,
+                });
+                socket.emit("join-success"); // Emit success if user joined successfully
+                console.log(sessions[sessionId].guests);
+            }
         }
         else {
-            socket.emit("error", "Session does not exist"); // Handle case when session does not exist
+            socket.emit("error", "Session does not exist");
         }
     });
     socket.on("suggest-restaurant", (restaurant) => {
@@ -104,6 +119,9 @@ io.on("connection", (socket) => {
             else {
                 // If the user is a guest, remove them from the session
                 sessions[sessionId].guests = sessions[sessionId].guests.filter((guestId) => guestId !== socket.id);
+                io.to(sessionId).emit("current-users", {
+                    count: sessions[sessionId].guests.length, // Including the host
+                });
             }
         }
     });
