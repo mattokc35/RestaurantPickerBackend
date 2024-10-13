@@ -29,7 +29,6 @@ interface Sessions {
   };
 }
 
-
 const sessions: Sessions = {};
 
 io.on("connection", (socket: Socket) => {
@@ -37,13 +36,15 @@ io.on("connection", (socket: Socket) => {
 
   // Create a new session (host)
   socket.on("create-session", (sessionId: string) => {
+    console.log(`host created joined ${sessionId}`);
+
     if (!sessions[sessionId]) {
       // Create a new session with the socket ID as the host
       sessions[sessionId] = {
         host: socket.id,
         guests: [],
         restaurants: [],
-        suggestedBy:[],
+        suggestedBy: [],
       };
     }
     socket.join(sessionId); // Join the room
@@ -52,24 +53,49 @@ io.on("connection", (socket: Socket) => {
     socket.emit("current-restaurants", sessions[sessionId].restaurants);
     io.to(sessionId).emit("current-users", {
       count: sessions[sessionId].guests.length, //including the host
-    })
+    });
     console.log(sessions[sessionId].guests);
+    console.log(sessions);
+  });
+
+  //check if a session is able to join
+  socket.on("check-session", (sessionId: string) => {
+    if (sessions[sessionId]) {
+      if (sessions[sessionId].guests.length >= 10) {
+        socket.emit("room-full");
+      } else {
+        //room exists and is not full
+        socket.emit("session-exists");
+      }
+    } else {
+      //session does not exist
+      socket.emit("session-not-found");
+    }
   });
 
   // Join an existing session (guest)
   socket.on("join-session", (sessionId: string) => {
+    console.log(`user joined ${sessionId}`);
     if (sessions[sessionId]) {
       if (sessions[sessionId].guests.length >= 10) {
         socket.emit("error", "Room is full. Max 10 users allowed");
       } else {
-        sessions[sessionId].guests.push(socket.id); // Add the guest
         socket.join(sessionId); // Join the room
+
+        // Now ensure the user has joined the room and add them as a guest
+        sessions[sessionId].guests.push(socket.id); // Add the guest
         socket.emit("role-assigned", "guest");
         socket.emit("current-restaurants", sessions[sessionId].restaurants);
+        socket.emit("join-success"); // Emit success if user joined successfully
+
+        // Emit the updated user count after adding the guest
         io.to(sessionId).emit("current-users", {
           count: sessions[sessionId].guests.length,
         });
-        socket.emit("join-success"); // Emit success if user joined successfully
+        console.log(
+          `Updated user count for session ${sessionId}: ${sessions[sessionId].guests.length}`
+        );
+        console.log(sessions);
         console.log(sessions[sessionId].guests);
       }
     } else {
@@ -78,7 +104,9 @@ io.on("connection", (socket: Socket) => {
   });
 
   socket.on("suggest-restaurant", (restaurant: string) => {
-    const sessionId = Array.from(socket.rooms).find((room) => room !== socket.id);
+    const sessionId = Array.from(socket.rooms).find(
+      (room) => room !== socket.id
+    );
     if (sessionId && sessions[sessionId]) {
       // Check if the user has already suggested a restaurant
       if (sessions[sessionId].suggestedBy.includes(socket.id)) {
@@ -95,9 +123,17 @@ io.on("connection", (socket: Socket) => {
 
   // Spin the wheel (only the host can trigger this)
   socket.on("spin-wheel", () => {
-    const sessionId = Array.from(socket.rooms).find((room) => room !== socket.id);
-    if (sessionId && sessions[sessionId] && sessions[sessionId].restaurants.length > 0) {
-      const randomIndex = Math.floor(Math.random() * sessions[sessionId].restaurants.length);
+    const sessionId = Array.from(socket.rooms).find(
+      (room) => room !== socket.id
+    );
+    if (
+      sessionId &&
+      sessions[sessionId] &&
+      sessions[sessionId].restaurants.length > 0
+    ) {
+      const randomIndex = Math.floor(
+        Math.random() * sessions[sessionId].restaurants.length
+      );
       const selectedRestaurant = sessions[sessionId].restaurants[randomIndex];
       io.to(sessionId).emit("spin-wheel", {
         restaurant: selectedRestaurant,
@@ -108,7 +144,9 @@ io.on("connection", (socket: Socket) => {
 
   // Delete session handler
   socket.on("delete-session", () => {
-    const sessionId = Array.from(socket.rooms).find((room) => room !== socket.id);
+    const sessionId = Array.from(socket.rooms).find(
+      (room) => room !== socket.id
+    );
     if (sessionId && sessions[sessionId]) {
       delete sessions[sessionId]; // Remove the session
       io.to(sessionId).emit("session-deleted"); // Notify all clients
@@ -116,14 +154,16 @@ io.on("connection", (socket: Socket) => {
     }
   });
 
-
   // Handle disconnect
   socket.on("disconnect", () => {
     console.log("A user disconnected");
 
     // Find the session the user was in
     const sessionId = Object.keys(sessions).find((id) => {
-      return sessions[id].host === socket.id || sessions[id].guests.includes(socket.id);
+      return (
+        sessions[id].host === socket.id ||
+        sessions[id].guests.includes(socket.id)
+      );
     });
 
     if (sessionId) {
@@ -141,12 +181,10 @@ io.on("connection", (socket: Socket) => {
         io.to(sessionId).emit("current-users", {
           count: sessions[sessionId].guests.length, // Including the host
         });
-
       }
     }
   });
 });
-
 
 server.listen(4000, () => {
   console.log("Server listening on port 4000");

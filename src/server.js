@@ -26,6 +26,7 @@ io.on("connection", (socket) => {
     console.log("A user connected");
     // Create a new session (host)
     socket.on("create-session", (sessionId) => {
+        console.log(`host created joined ${sessionId}`);
         if (!sessions[sessionId]) {
             // Create a new session with the socket ID as the host
             sessions[sessionId] = {
@@ -43,22 +44,44 @@ io.on("connection", (socket) => {
             count: sessions[sessionId].guests.length, //including the host
         });
         console.log(sessions[sessionId].guests);
+        console.log(sessions);
+    });
+    //check if a session is able to join
+    socket.on("check-session", (sessionId) => {
+        if (sessions[sessionId]) {
+            if (sessions[sessionId].guests.length >= 10) {
+                socket.emit("room-full");
+            }
+            else {
+                //room exists and is not full
+                socket.emit("session-exists");
+            }
+        }
+        else {
+            //session does not exist
+            socket.emit("session-not-found");
+        }
     });
     // Join an existing session (guest)
     socket.on("join-session", (sessionId) => {
+        console.log(`user joined ${sessionId}`);
         if (sessions[sessionId]) {
             if (sessions[sessionId].guests.length >= 10) {
                 socket.emit("error", "Room is full. Max 10 users allowed");
             }
             else {
-                sessions[sessionId].guests.push(socket.id); // Add the guest
                 socket.join(sessionId); // Join the room
+                // Now ensure the user has joined the room and add them as a guest
+                sessions[sessionId].guests.push(socket.id); // Add the guest
                 socket.emit("role-assigned", "guest");
                 socket.emit("current-restaurants", sessions[sessionId].restaurants);
+                socket.emit("join-success"); // Emit success if user joined successfully
+                // Emit the updated user count after adding the guest
                 io.to(sessionId).emit("current-users", {
                     count: sessions[sessionId].guests.length,
                 });
-                socket.emit("join-success"); // Emit success if user joined successfully
+                console.log(`Updated user count for session ${sessionId}: ${sessions[sessionId].guests.length}`);
+                console.log(sessions);
                 console.log(sessions[sessionId].guests);
             }
         }
@@ -83,7 +106,9 @@ io.on("connection", (socket) => {
     // Spin the wheel (only the host can trigger this)
     socket.on("spin-wheel", () => {
         const sessionId = Array.from(socket.rooms).find((room) => room !== socket.id);
-        if (sessionId && sessions[sessionId] && sessions[sessionId].restaurants.length > 0) {
+        if (sessionId &&
+            sessions[sessionId] &&
+            sessions[sessionId].restaurants.length > 0) {
             const randomIndex = Math.floor(Math.random() * sessions[sessionId].restaurants.length);
             const selectedRestaurant = sessions[sessionId].restaurants[randomIndex];
             io.to(sessionId).emit("spin-wheel", {
@@ -106,7 +131,8 @@ io.on("connection", (socket) => {
         console.log("A user disconnected");
         // Find the session the user was in
         const sessionId = Object.keys(sessions).find((id) => {
-            return sessions[id].host === socket.id || sessions[id].guests.includes(socket.id);
+            return (sessions[id].host === socket.id ||
+                sessions[id].guests.includes(socket.id));
         });
         if (sessionId) {
             // If the user is the host, delete the session
