@@ -37,11 +37,10 @@ io.on("connection", (socket) => {
             };
         }
         socket.join(sessionId); // Join the room
-        sessions[sessionId].guests.push(socket.id); //add the host
         socket.emit("role-assigned", "host"); // Assign the role of 'host' to the user
         socket.emit("current-restaurants", sessions[sessionId].restaurants);
         io.to(sessionId).emit("current-users", {
-            count: sessions[sessionId].guests.length, //including the host
+            count: sessions[sessionId].guests.length + 1, //including the host
         });
         console.log(sessions[sessionId].guests);
         console.log(sessions);
@@ -78,7 +77,7 @@ io.on("connection", (socket) => {
                 socket.emit("join-success"); // Emit success if user joined successfully
                 // Emit the updated user count after adding the guest
                 io.to(sessionId).emit("current-users", {
-                    count: sessions[sessionId].guests.length,
+                    count: sessions[sessionId].guests.length + 1,
                 });
                 console.log(`Updated user count for session ${sessionId}: ${sessions[sessionId].guests.length}`);
                 console.log(sessions);
@@ -89,17 +88,19 @@ io.on("connection", (socket) => {
             socket.emit("error", "Session does not exist");
         }
     });
-    socket.on("suggest-restaurant", (restaurant) => {
-        const sessionId = Array.from(socket.rooms).find((room) => room !== socket.id);
-        if (sessionId && sessions[sessionId]) {
+    socket.on("suggest-restaurant", (sessionId, restaurant) => {
+        const session = sessions[sessionId];
+        if (session) {
+            const session = sessions[sessionId];
             // Check if the user has already suggested a restaurant
-            if (sessions[sessionId].suggestedBy.includes(socket.id)) {
+            console.log("SESSION: ", session, ",", sessionId);
+            if (session.suggestedBy.includes(socket.id)) {
                 socket.emit("error", "You have already suggested a restaurant.");
                 return;
             }
             // Add the restaurant and mark the user as having suggested one
-            sessions[sessionId].restaurants.push(restaurant);
-            sessions[sessionId].suggestedBy.push(socket.id);
+            session.restaurants.push(restaurant);
+            session.suggestedBy.push(socket.id);
             io.to(sessionId).emit("restaurant-suggested", restaurant);
         }
     });
@@ -146,7 +147,7 @@ io.on("connection", (socket) => {
                 // If the user is a guest, remove them from the session
                 sessions[sessionId].guests = sessions[sessionId].guests.filter((guestId) => guestId !== socket.id);
                 io.to(sessionId).emit("current-users", {
-                    count: sessions[sessionId].guests.length, // Including the host
+                    count: sessions[sessionId].guests.length + 1, // Including the host
                 });
             }
         }
