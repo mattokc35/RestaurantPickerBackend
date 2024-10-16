@@ -2,6 +2,12 @@ import express from "express";
 import http from "http";
 import cors from "cors";
 import { Server, Socket } from "socket.io";
+import { handleQuickDrawGame } from "./games/quickDrawGameServer";
+
+export interface Restaurant {
+  name:string
+  suggestedBy: string
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -32,7 +38,7 @@ const sessions: Sessions = {};
 
 io.on("connection", (socket: Socket) => {
   console.log("A user connected");
-
+  handleQuickDrawGame(io, socket, sessions);
   // Create a new session (host)
   socket.on("create-session", (sessionId: string) => {
     console.log(`host created joined ${sessionId}`);
@@ -183,6 +189,14 @@ io.on("connection", (socket: Socket) => {
       });
     }
   });
+
+  //handle game option change
+  socket.on("game-option-changed", ({sessionId, gameOption}) => {
+    const session = sessions[sessionId];
+    if(session){
+      io.to(sessionId).emit("game-option-updated", gameOption);
+    }
+  })
 
   // Delete session handler
   socket.on("delete-session", () => {

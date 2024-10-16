@@ -7,6 +7,7 @@ const express_1 = __importDefault(require("express"));
 const http_1 = __importDefault(require("http"));
 const cors_1 = __importDefault(require("cors"));
 const socket_io_1 = require("socket.io");
+const quickDrawGameServer_1 = require("./games/quickDrawGameServer");
 const app = (0, express_1.default)();
 const server = http_1.default.createServer(app);
 const io = new socket_io_1.Server(server, {
@@ -24,6 +25,7 @@ app.use(express_1.default.json());
 const sessions = {};
 io.on("connection", (socket) => {
     console.log("A user connected");
+    (0, quickDrawGameServer_1.handleQuickDrawGame)(io, socket, sessions);
     // Create a new session (host)
     socket.on("create-session", (sessionId) => {
         console.log(`host created joined ${sessionId}`);
@@ -145,6 +147,13 @@ io.on("connection", (socket) => {
                 suggestedBy: selectedRestaurant.suggestedBy,
                 index: randomIndex,
             });
+        }
+    });
+    //handle game option change
+    socket.on("game-option-changed", ({ sessionId, gameOption }) => {
+        const session = sessions[sessionId];
+        if (session) {
+            io.to(sessionId).emit("game-option-updated", gameOption);
         }
     });
     // Delete session handler
