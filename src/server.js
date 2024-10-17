@@ -8,6 +8,7 @@ const http_1 = __importDefault(require("http"));
 const cors_1 = __importDefault(require("cors"));
 const socket_io_1 = require("socket.io");
 const quickDrawGameServer_1 = require("./games/quickDrawGameServer");
+const helperFunctions_1 = require("./helpers/helperFunctions");
 const app = (0, express_1.default)();
 const server = http_1.default.createServer(app);
 const io = new socket_io_1.Server(server, {
@@ -29,15 +30,17 @@ io.on("connection", (socket) => {
     // Create a new session (host)
     socket.on("create-session", (sessionId) => {
         console.log(`host created joined ${sessionId}`);
+        const hostUsername = (0, helperFunctions_1.generateUsername)(socket.id);
         if (!sessions[sessionId]) {
             // Create a new session with the socket ID as the host
             sessions[sessionId] = {
-                host: socket.id,
+                host: { id: socket.id, username: hostUsername },
                 guests: [],
                 restaurants: [],
             };
         }
         socket.join(sessionId); // Join the room
+        socket.emit("user-details", { id: socket.id, username: hostUsername });
         socket.emit("role-assigned", "host"); // Assign the role of 'host' to the user
         socket.emit("current-restaurants", sessions[sessionId].restaurants);
         io.to(sessionId).emit("current-users", {
@@ -66,7 +69,7 @@ io.on("connection", (socket) => {
         const session = sessions[sessionId];
         if (session) {
             // If the user is the host, delete the session
-            if (session.host === socket.id) {
+            if (session.host.id === socket.id) {
                 console.log(`Host left. Deleting session ${sessionId}.`);
                 // Notify all clients that the session is deleted
                 io.to(sessionId).emit("session-deleted");
@@ -76,9 +79,9 @@ io.on("connection", (socket) => {
             }
             else {
                 // If the user is a guest, remove them from the session
-                session.guests = session.guests.filter((guestId) => guestId !== socket.id);
+                session.guests = session.guests.filter((guest) => guest.id !== socket.id);
                 // Remove the guest's restaurant(s) from the session
-                session.restaurants = session.restaurants.filter((restaurant) => restaurant.suggestedBy !== socket.id);
+                session.restaurants = session.restaurants.filter((restaurant) => restaurant.suggestedBy.id !== socket.id);
                 console.log(`Guest left session ${sessionId}. Updated guests: ${session.guests}`);
                 // Notify other users about the updated restaurant list and user count
                 io.to(sessionId).emit("current-users", {
@@ -99,8 +102,11 @@ io.on("connection", (socket) => {
             }
             else {
                 socket.join(sessionId); // Join the room
+                const randomGuestUsername = (0, helperFunctions_1.generateUsername)(socket.id);
+                const guestObject = { id: socket.id, username: randomGuestUsername };
                 // Now ensure the user has joined the room and add them as a guest
-                sessions[sessionId].guests.push(socket.id); // Add the guest
+                sessions[sessionId].guests.push(guestObject); // Add the guest
+                socket.emit("user-details", { id: socket.id, username: randomGuestUsername });
                 socket.emit("role-assigned", "guest");
                 socket.emit("current-restaurants", sessions[sessionId].restaurants);
                 socket.emit("join-success"); // Emit success if user joined successfully
@@ -121,17 +127,24 @@ io.on("connection", (socket) => {
         const session = sessions[sessionId];
         if (session) {
             // Check if the user has already suggested a restaurant
-            const alreadySuggested = session.restaurants.some((r) => r.suggestedBy === socket.id);
+            const alreadySuggested = session.restaurants.some((r) => r.suggestedBy.id === socket.id);
             if (alreadySuggested) {
                 socket.emit("error", "You have already suggested a restaurant");
             }
+            //find the user (host or guest) who is suggesting the restaurant
+            const user = session.host.id === socket.id ? session.host : session.guests.find((guest) => guest.id === socket.id);
             // Add the restaurant and mark the user as having suggested one
-            session.restaurants.push({ name: restaurant, suggestedBy: socket.id });
-            io.to(sessionId).emit("restaurant-suggested", {
-                name: restaurant,
-                suggestedBy: socket.id,
-            });
-            console.log(session);
+            if (user) {
+                session.restaurants.push({ name: restaurant, suggestedBy: user });
+                io.to(sessionId).emit("restaurant-suggested", {
+                    name: restaurant,
+                    suggestedBy: user,
+                });
+                console.log(session);
+            }
+            else {
+                socket.emit("error", "User not found in session");
+            }
         }
     });
     // Spin the wheel (only the host can trigger this)
@@ -170,12 +183,12 @@ io.on("connection", (socket) => {
         console.log("A user disconnected");
         // Find the session the user was in
         const sessionId = Object.keys(sessions).find((id) => {
-            return (sessions[id].host === socket.id ||
-                sessions[id].guests.includes(socket.id));
+            return (sessions[id].host.id === socket.id ||
+                sessions[id].guests.some((guest) => guest.id === socket.id));
         });
         if (sessionId) {
             // If the user is the host, delete the session
-            if (sessions[sessionId].host === socket.id) {
+            if (sessions[sessionId].host.id === socket.id) {
                 console.log(`Host disconnected. Deleting session ${sessionId}.`);
                 delete sessions[sessionId];
                 io.to(sessionId).emit("session-deleted"); // Notify all clients the session is deleted
@@ -183,7 +196,7 @@ io.on("connection", (socket) => {
             }
             else {
                 // If the user is a guest, remove them from the session
-                sessions[sessionId].guests = sessions[sessionId].guests.filter((guestId) => guestId !== socket.id);
+                sessions[sessionId].guests = sessions[sessionId].guests.filter((guest) => guest.id !== socket.id);
                 io.to(sessionId).emit("current-users", {
                     count: sessions[sessionId].guests.length + 1, // Including the host
                 });
