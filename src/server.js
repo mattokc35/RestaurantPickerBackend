@@ -106,7 +106,10 @@ io.on("connection", (socket) => {
                 const guestObject = { id: socket.id, username: randomGuestUsername };
                 // Now ensure the user has joined the room and add them as a guest
                 sessions[sessionId].guests.push(guestObject); // Add the guest
-                socket.emit("user-details", { id: socket.id, username: randomGuestUsername });
+                socket.emit("user-details", {
+                    id: socket.id,
+                    username: randomGuestUsername,
+                });
                 socket.emit("role-assigned", "guest");
                 socket.emit("current-restaurants", sessions[sessionId].restaurants);
                 socket.emit("join-success"); // Emit success if user joined successfully
@@ -132,7 +135,9 @@ io.on("connection", (socket) => {
                 socket.emit("error", "You have already suggested a restaurant");
             }
             //find the user (host or guest) who is suggesting the restaurant
-            const user = session.host.id === socket.id ? session.host : session.guests.find((guest) => guest.id === socket.id);
+            const user = session.host.id === socket.id
+                ? session.host
+                : session.guests.find((guest) => guest.id === socket.id);
             // Add the restaurant and mark the user as having suggested one
             if (user) {
                 session.restaurants.push({ name: restaurant, suggestedBy: user });
@@ -171,6 +176,7 @@ io.on("connection", (socket) => {
     });
     // Delete session handler
     socket.on("delete-session", () => {
+        console.log("delete session");
         const sessionId = Array.from(socket.rooms).find((room) => room !== socket.id);
         if (sessionId && sessions[sessionId]) {
             delete sessions[sessionId]; // Remove the session

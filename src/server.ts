@@ -6,8 +6,8 @@ import { handleQuickDrawGame } from "./games/quickDrawGameServer";
 import { generateUsername } from "./helpers/helperFunctions";
 
 export interface Restaurant {
-  name:string
-  suggestedBy: User
+  name: string;
+  suggestedBy: User;
 }
 
 const app = express();
@@ -28,8 +28,8 @@ app.use(express.json());
 
 // user interface
 export interface User {
-  id: string,
-  username: string,
+  id: string;
+  username: string;
 }
 
 // Sessions interface
@@ -53,13 +53,13 @@ io.on("connection", (socket: Socket) => {
     if (!sessions[sessionId]) {
       // Create a new session with the socket ID as the host
       sessions[sessionId] = {
-        host: {id: socket.id, username: hostUsername },
+        host: { id: socket.id, username: hostUsername },
         guests: [],
         restaurants: [],
       };
     }
     socket.join(sessionId); // Join the room
-    socket.emit("user-details", {id: socket.id, username: hostUsername});
+    socket.emit("user-details", { id: socket.id, username: hostUsername });
     socket.emit("role-assigned", "host"); // Assign the role of 'host' to the user
     socket.emit("current-restaurants", sessions[sessionId].restaurants);
     io.to(sessionId).emit("current-users", {
@@ -134,10 +134,13 @@ io.on("connection", (socket: Socket) => {
       } else {
         socket.join(sessionId); // Join the room
         const randomGuestUsername = generateUsername(socket.id);
-        const guestObject = {id: socket.id, username: randomGuestUsername}
+        const guestObject = { id: socket.id, username: randomGuestUsername };
         // Now ensure the user has joined the room and add them as a guest
         sessions[sessionId].guests.push(guestObject); // Add the guest
-        socket.emit("user-details", {id: socket.id, username: randomGuestUsername});
+        socket.emit("user-details", {
+          id: socket.id,
+          username: randomGuestUsername,
+        });
         socket.emit("role-assigned", "guest");
         socket.emit("current-restaurants", sessions[sessionId].restaurants);
         socket.emit("join-success"); // Emit success if user joined successfully
@@ -169,19 +172,21 @@ io.on("connection", (socket: Socket) => {
         socket.emit("error", "You have already suggested a restaurant");
       }
       //find the user (host or guest) who is suggesting the restaurant
-      const user: User | undefined = session.host.id === socket.id ? session.host : session.guests.find((guest) => guest.id === socket.id);
+      const user: User | undefined =
+        session.host.id === socket.id
+          ? session.host
+          : session.guests.find((guest) => guest.id === socket.id);
       // Add the restaurant and mark the user as having suggested one
-      if(user){
+      if (user) {
         session.restaurants.push({ name: restaurant, suggestedBy: user });
         io.to(sessionId).emit("restaurant-suggested", {
           name: restaurant,
           suggestedBy: user,
         });
         console.log(session);
-      }else{
+      } else {
         socket.emit("error", "User not found in session");
       }
-     
     }
   });
 
@@ -208,15 +213,16 @@ io.on("connection", (socket: Socket) => {
   });
 
   //handle game option change
-  socket.on("game-option-changed", ({sessionId, gameOption}) => {
+  socket.on("game-option-changed", ({ sessionId, gameOption }) => {
     const session = sessions[sessionId];
-    if(session){
+    if (session) {
       io.to(sessionId).emit("game-option-updated", gameOption);
     }
-  })
+  });
 
   // Delete session handler
   socket.on("delete-session", () => {
+    console.log("delete session");
     const sessionId = Array.from(socket.rooms).find(
       (room) => room !== socket.id
     );

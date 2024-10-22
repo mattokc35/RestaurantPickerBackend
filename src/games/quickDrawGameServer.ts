@@ -67,8 +67,6 @@ export const handleQuickDrawGame = (
         ) {
           const currentGameScoresandPlayersArray =
             quickDrawGames[sessionId].players;
-          console.log("TEST");
-          console.log(currentGameScoresandPlayersArray);
           const sortedScores = currentGameScoresandPlayersArray.sort(
             (a, b) => a.score - b.score
           );
@@ -76,7 +74,9 @@ export const handleQuickDrawGame = (
           //find player with fastest reaction time, winner variable will hold [playerId, reactionTime] of the fastest player
           const winner = Object.entries(
             quickDrawGames[sessionId].players
-          ).reduce((prev, curr) => (curr[1].score < prev[1].score ? curr : prev));
+          ).reduce((prev, curr) =>
+            curr[1].score < prev[1].score ? curr : prev
+          );
           console.log("winner: " + winner);
           const [winnerId, winnerScore] = [winner[1].id, winner[1].score];
           const winnerRestaurant = sessions[sessionId].restaurants.find(
