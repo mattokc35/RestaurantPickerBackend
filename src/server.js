@@ -8,6 +8,7 @@ const http_1 = __importDefault(require("http"));
 const cors_1 = __importDefault(require("cors"));
 const socket_io_1 = require("socket.io");
 const quickDrawGameServer_1 = require("./games/quickDrawGameServer");
+const plateBalanceGameServer_1 = require("./games/plateBalanceGameServer");
 const helperFunctions_1 = require("./helpers/helperFunctions");
 const app = (0, express_1.default)();
 const server = http_1.default.createServer(app);
@@ -27,6 +28,7 @@ const sessions = {};
 io.on("connection", (socket) => {
     console.log("A user connected");
     (0, quickDrawGameServer_1.handleQuickDrawGame)(io, socket, sessions);
+    (0, plateBalanceGameServer_1.handlePlateBalanceGame)(io, socket, sessions);
     // Create a new session (host)
     socket.on("create-session", (sessionId) => {
         console.log(`host created joined ${sessionId}`);

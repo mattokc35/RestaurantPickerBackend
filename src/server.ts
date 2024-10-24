@@ -3,6 +3,7 @@ import http from "http";
 import cors from "cors";
 import { Server, Socket } from "socket.io";
 import { handleQuickDrawGame } from "./games/quickDrawGameServer";
+import { handlePlateBalanceGame } from "./games/plateBalanceGameServer";
 import { generateUsername } from "./helpers/helperFunctions";
 
 export interface Restaurant {
@@ -46,6 +47,7 @@ const sessions: Sessions = {};
 io.on("connection", (socket: Socket) => {
   console.log("A user connected");
   handleQuickDrawGame(io, socket, sessions);
+  handlePlateBalanceGame(io, socket, sessions);
   // Create a new session (host)
   socket.on("create-session", (sessionId: string) => {
     console.log(`host created joined ${sessionId}`);
